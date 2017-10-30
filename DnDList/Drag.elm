@@ -3,16 +3,16 @@ module DnDList.Drag exposing (..)
 import Mouse
 
 
-type alias Drag =
-    { down : Bool -- is mouse down
-    , drag : Bool -- is mouse down and moved from click location
-    , startI : Maybe Int
-    , dragI : Maybe Int
-    }
+type Drag
+    = NoDrag
+    | Hover Int
+    | DragStart Int
+    | ActiveDrag { startI : Int, dragI : Int }
+    | CancelDrag Int -- drag out of bounds undoes the drag
 
 
 init =
-    Drag False False Nothing Nothing
+    NoDrag
 
 
 type Msg
@@ -27,34 +27,47 @@ update : Msg -> Drag -> Drag
 update msg model =
     case msg of
         EnterI i ->
-            if model.drag then
-                { model | dragI = Just i }
-            else
-                { model | startI = Just i }
+            case model of
+                ActiveDrag { startI, dragI } ->
+                    ActiveDrag { startI = startI, dragI = i }
+
+                CancelDrag startI ->
+                    ActiveDrag { startI = startI, dragI = i }
+
+                _ ->
+                    Hover i
 
         Leave ->
-            if model.drag then
-                { model | dragI = Nothing }
-            else
-                { model | startI = Nothing }
+            case model of
+                ActiveDrag { startI, dragI } ->
+                    CancelDrag startI
+
+                _ ->
+                    NoDrag
 
         Move event ->
-            if not model.down then
-                model
-            else
-                { model | drag = True }
+            case model of
+                DragStart i ->
+                    ActiveDrag { startI = i, dragI = i }
+
+                _ ->
+                    model
 
         Down event ->
-            { model | down = True }
+            case model of
+                Hover i ->
+                    DragStart i
+
+                _ ->
+                    model
 
         Up event ->
-            { init
-                | startI =
-                    case model.dragI of
-                        Just _ ->
-                            model.dragI
+            case model of
+                ActiveDrag { startI, dragI } ->
+                    Hover dragI
 
-                        Nothing ->
-                            -- if the click
-                            model.startI
-            }
+                DragStart i ->
+                    Hover i
+
+                _ ->
+                    model

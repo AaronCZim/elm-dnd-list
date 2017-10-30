@@ -24,13 +24,12 @@ init3 =
 
 
 fromList list =
-    Model list "" Nothing Drag.init
+    Model list "" Drag.init
 
 
 type alias Model =
     { list : List String
     , input : String
-    , caret : Maybe Int
     , drag : Drag.Drag
     }
 
@@ -87,25 +86,23 @@ dragUp event model =
         newDrag =
             Drag.update (Drag.Up event) model.drag
     in
-        if model.drag.drag == True && newDrag.drag == False then
-            { model
-                | drag = newDrag
-                , list =
-                    case
-                        Maybe.map2 (\i -> \j -> swap i j)
-                            model.drag.startI
-                            model.drag.dragI
-                    of
-                        Nothing ->
-                            model.list
+        case model.drag of
+            Drag.ActiveDrag { startI, dragI } ->
+                case newDrag of
+                    Drag.Hover i ->
+                        { model
+                            | drag = newDrag
+                            , list =
+                                model.list
+                                    |> swap startI dragI
+                                    |> Maybe.withDefault model.list
+                        }
 
-                        Just swapper ->
-                            model.list
-                                |> swapper
-                                |> Maybe.withDefault model.list
-            }
-        else
-            { model | drag = newDrag }
+                    _ ->
+                        { model | drag = newDrag }
+
+            _ ->
+                { model | drag = newDrag }
 
 
 swap : Int -> Int -> List String -> Maybe (List String)
@@ -168,6 +165,7 @@ view model =
         ]
 
 
+appendItemView : Model -> Html Msg
 appendItemView model =
     InputGroup.config
         (InputGroup.text
@@ -187,6 +185,7 @@ appendItemView model =
         |> InputGroup.view
 
 
+listView : Model -> Card.BlockItem Msg
 listView model =
     Card.custom <|
         div
@@ -201,15 +200,16 @@ listView model =
             ]
 
 
+listItemView : Model -> Int -> String -> ListGroup.Item Msg
 listItemView model i item =
     let
         active =
-            model.drag.drag
-                && (Just i
-                        == model.drag.startI
-                        || Just i
-                        == model.drag.dragI
-                   )
+            case model.drag of
+                Drag.ActiveDrag { startI, dragI } ->
+                    i == startI || i == dragI
+
+                _ ->
+                    False
     in
         ListGroup.li
             ([ ListGroup.attrs
