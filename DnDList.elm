@@ -39,9 +39,6 @@ type Msg
     | Remove Int
     | TextInput String
     | DragMsg Drag.Msg
-    | DragMove Mouse.Event
-    | DragDown Mouse.Event
-    | DragUp Mouse.Event
 
 
 update : Msg -> Model -> Model
@@ -68,16 +65,12 @@ update msg model =
             { model | input = str }
 
         DragMsg msg ->
-            { model | drag = Drag.update msg model.drag }
+            case msg of
+                Drag.Up event ->
+                    dragUp event model
 
-        DragMove event ->
-            { model | drag = Drag.update (Drag.Move event) model.drag }
-
-        DragDown event ->
-            { model | drag = Drag.update (Drag.Down event) model.drag }
-
-        DragUp event ->
-            dragUp event model
+                _ ->
+                    { model | drag = Drag.update msg model.drag }
 
 
 dragUp : Mouse.Event -> Model -> Model
@@ -188,19 +181,27 @@ appendItemView model =
 listView : Model -> Card.BlockItem Msg
 listView model =
     Card.custom <|
-        div
-            [ DragMove |> Mouse.onMove
-            , DragDown |> Mouse.onDown
-            , DragUp |> Mouse.onUp
-            ]
-            [ ListGroup.ul
-                (model.list
-                    |> List.indexedMap (listItemView model)
-                )
-            ]
+        (Html.map mapDragMsg
+            (div
+                [ Drag.Move |> Mouse.onMove
+                , Drag.Down |> Mouse.onDown
+                , Drag.Up |> Mouse.onUp
+                ]
+                [ ListGroup.ul
+                    (model.list
+                        |> List.indexedMap (listItemView model)
+                    )
+                ]
+            )
+        )
 
 
-listItemView : Model -> Int -> String -> ListGroup.Item Msg
+mapDragMsg : Drag.Msg -> Msg
+mapDragMsg msg =
+    DragMsg msg
+
+
+listItemView : Model -> Int -> String -> ListGroup.Item Drag.Msg
 listItemView model i item =
     let
         active =
@@ -213,8 +214,8 @@ listItemView model i item =
     in
         ListGroup.li
             ([ ListGroup.attrs
-                [ DragMsg (Drag.EnterI i) |> onMouseEnter
-                , DragMsg (Drag.Leave) |> onMouseLeave
+                [ (Drag.EnterI i) |> onMouseEnter
+                , Drag.Leave |> onMouseLeave
                 ]
              ]
                 ++ if active then
