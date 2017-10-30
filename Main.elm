@@ -6,7 +6,7 @@ import DnDList exposing (..)
 
 main =
     Html.beginnerProgram
-        { model = init
+        { model = init3
         , update = update
         , view = view
         }

@@ -19,6 +19,10 @@ init =
     fromList []
 
 
+init3 =
+    fromList [ "one", "two", "three" ]
+
+
 fromList list =
     Model list "" Nothing Drag.init
 
@@ -74,7 +78,7 @@ update msg model =
             { model | drag = Drag.update (Drag.Down event) model.drag }
 
         DragUp event ->
-            { model | drag = Drag.update (Drag.Up event) model.drag }
+            dragUp event model
 
 
 dragUp : Mouse.Event -> Model -> Model
@@ -83,7 +87,25 @@ dragUp event model =
         newDrag =
             Drag.update (Drag.Up event) model.drag
     in
-        { model | drag = newDrag }
+        if model.drag.drag == True && newDrag.drag == False then
+            { model
+                | drag = newDrag
+                , list =
+                    case
+                        Maybe.map2 (\i -> \j -> swap i j)
+                            model.drag.startI
+                            model.drag.dragI
+                    of
+                        Nothing ->
+                            model.list
+
+                        Just swapper ->
+                            model.list
+                                |> swapper
+                                |> Maybe.withDefault model.list
+            }
+        else
+            { model | drag = newDrag }
 
 
 swap : Int -> Int -> List String -> Maybe (List String)
@@ -131,13 +153,7 @@ view model =
         [ CDN.stylesheet
         , Grid.row []
             [ Grid.col [ Col.xs12 ]
-                [ Card.config
-                    [ Card.attrs
-                        ([ DragMsg (Drag.SetMonitoring True) |> onMouseEnter
-                         , DragMsg (Drag.SetMonitoring False) |> onMouseLeave
-                         ]
-                        )
-                    ]
+                [ Card.config []
                     |> Card.header []
                         [ h2 [] [ text "Drag and Drop List" ] ]
                     |> Card.block []
@@ -173,7 +189,11 @@ appendItemView model =
 
 listView model =
     Card.custom <|
-        div []
+        div
+            [ DragMove |> Mouse.onMove
+            , DragDown |> Mouse.onDown
+            , DragUp |> Mouse.onUp
+            ]
             [ ListGroup.ul
                 (model.list
                     |> List.indexedMap (listItemView model)
@@ -182,15 +202,24 @@ listView model =
 
 
 listItemView model i item =
-    ListGroup.li
-        ([ ListGroup.attrs
-            (if model.drag.monitoring then
+    let
+        active =
+            model.drag.drag
+                && (Just i
+                        == model.drag.startI
+                        || Just i
+                        == model.drag.dragI
+                   )
+    in
+        ListGroup.li
+            ([ ListGroup.attrs
                 [ DragMsg (Drag.EnterI i) |> onMouseEnter
                 , DragMsg (Drag.Leave) |> onMouseLeave
                 ]
-             else
-                []
+             ]
+                ++ if active then
+                    [ ListGroup.active ]
+                   else
+                    []
             )
-         ]
-        )
-        [ text item ]
+            [ text item ]

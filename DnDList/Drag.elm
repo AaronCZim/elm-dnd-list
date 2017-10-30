@@ -4,21 +4,19 @@ import Mouse
 
 
 type alias Drag =
-    { monitoring : Bool
-    , down : Bool
-    , drag : Bool
+    { down : Bool -- is mouse down
+    , drag : Bool -- is mouse down and moved from click location
     , startI : Maybe Int
     , dragI : Maybe Int
     }
 
 
 init =
-    Drag False False False Nothing Nothing
+    Drag False False Nothing Nothing
 
 
 type Msg
-    = SetMonitoring Bool
-    | EnterI Int
+    = EnterI Int
     | Leave
     | Move Mouse.Event
     | Down Mouse.Event
@@ -28,12 +26,6 @@ type Msg
 update : Msg -> Drag -> Drag
 update msg model =
     case msg of
-        SetMonitoring monitoring ->
-            if monitoring then
-                { model | monitoring = True }
-            else
-                init
-
         EnterI i ->
             if model.drag then
                 { model | dragI = Just i }
@@ -57,12 +49,12 @@ update msg model =
 
         Up event ->
             { init
-                | monitoring = model.monitoring
-                , startI =
+                | startI =
                     case model.dragI of
                         Just _ ->
                             model.dragI
 
                         Nothing ->
+                            -- if the click
                             model.startI
             }
