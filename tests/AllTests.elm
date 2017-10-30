@@ -18,38 +18,15 @@ all =
         , test """Remove 0 from ["hello", "hi"]""" <|
             \() ->
                 (fromList [ "hello", "hi" ]
-                    |> update (Remove (Just (SingleSelection 0)))
+                    |> update (Remove 0)
                 )
                     |> Expect.equal (fromList [ "hi" ])
         , test """Remove 1 from ["hello", "hi"]""" <|
             \() ->
                 (fromList [ "hello", "hi" ]
-                    |> update (Remove (Just (SingleSelection 1)))
+                    |> update (Remove 1)
                 )
                     |> Expect.equal (fromList [ "hello" ])
-        , test "select 0 from NoSelection" <|
-            \() ->
-                (init3 |> update (Click 0) |> .selection)
-                    |> Expect.equal
-                        (Just (SingleSelection 0))
-        , test "select 1 from 0" <|
-            \() ->
-                (init3 |> update (Click 1) |> .selection)
-                    |> Expect.equal
-                        (Just (SingleSelection 1))
-        , test "inSelection: Yes (Single Selection)" <|
-            \() ->
-                (inSelection 0 (Just (SingleSelection 0)))
-                    |> Expect.equal
-                        True
-        , test "inSelection: No (No Selection)" <|
-            \() ->
-                (inSelection 0 Nothing)
-                    |> Expect.equal False
-        , test "inSelection: No (Single Selection, Miss)" <|
-            \() ->
-                (inSelection 1 (Just (SingleSelection 0)))
-                    |> Expect.equal False
         , test """swap 0 -1 ["one", "two", "three"]""" <|
             \() ->
                 (init3List |> swap 0 -1)
