@@ -3,6 +3,8 @@ module DnDList exposing (..)
 import Html exposing (..)
 import Html.Events exposing (..)
 import Html.Attributes exposing (..)
+import Dom
+import Task
 import Mouse
 import Keyboard
 import Char
@@ -15,17 +17,45 @@ import Bootstrap.Button as Button
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
 import DnDList.Drag as Drag
+import SelectClassName
+
+
+textInputClass =
+    "dnd_list_add_item_label_input"
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Keyboard.presses KeyPress
+
+
+inputFocus =
+    ("." ++ textInputClass)
+        |> SelectClassName.focus
+        |> Task.attempt (\_ -> NoOp)
 
 
 init =
-    fromList []
+    ( initModel, Cmd.none )
+
+
+initModel =
+    modelFromList []
 
 
 init3 =
-    fromList [ "one", "two", "three" ]
+    ( initModel, Cmd.none )
 
 
-fromList list =
+initModel3 =
+    modelFromList [ "one", "two", "three" ]
+
+
+fromList =
+    ( modelFromList, Cmd.none )
+
+
+modelFromList list =
     Model list "" Drag.init
 
 
@@ -37,7 +67,8 @@ type alias Model =
 
 
 type Msg
-    = Append String
+    = NoOp
+    | Append String
     | Remove Int
     | TextInput String
     | KeyPress Keyboard.KeyCode
@@ -46,67 +77,82 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( updateModel msg model, Cmd.none )
-
-
-updateModel : Msg -> Model -> Model
-updateModel msg model =
     case msg of
+        NoOp ->
+            ( model, Cmd.none )
+
         Append value ->
-            { model
+            ( { model
                 | list = model.list ++ [ value ]
                 , input = ""
-            }
+              }
+            , inputFocus
+            )
 
         Remove i ->
-            { model
-                | list =
-                    (model.list
-                        |> List.take i
-                    )
-                        ++ (model.list
-                                |> List.drop (i + 1)
-                           )
-            }
+            ( { model | list = model.list |> remove i }
+            , Cmd.none
+            )
 
         TextInput str ->
-            { model | input = str }
+            ( { model | input = str }
+            , Cmd.none
+            )
 
         KeyPress keyCode ->
             -- KeyCode 13 is the return key
             if keyCode == 13 then
                 case model.drag of
                     Drag.Editing i value ->
-                        { model
-                            | drag = Drag.update Drag.Commit model.drag
-                            , list = commitList model
-                        }
+                        let
+                            ( dragModel, dragCmd ) =
+                                Drag.update Drag.Commit model.drag
+                        in
+                            ( { model
+                                | drag = dragModel
+                                , list = commitList model
+                              }
+                            , dragCmd
+                                |> Cmd.map (\msg -> DragMsg msg)
+                            )
 
                     _ ->
-                        model
+                        ( model, Cmd.none )
             else
-                model
+                ( model, Cmd.none )
 
         DragMsg msg ->
-            case msg of
-                Drag.Up event ->
-                    dragUp event model
+            let
+                ( dragModel, dragCmd ) =
+                    Drag.update msg model.drag
+            in
+                case msg of
+                    Drag.Up event ->
+                        dragUp event model dragModel dragCmd
 
-                Drag.Commit ->
-                    { model
-                        | drag = Drag.update msg model.drag
-                        , list = commitList model
-                    }
+                    Drag.Commit ->
+                        ( { model
+                            | drag = dragModel
+                            , list = commitList model
+                          }
+                        , dragCmd
+                            |> Cmd.map (\msg -> DragMsg msg)
+                        )
 
-                _ ->
-                    { model | drag = Drag.update msg model.drag }
+                    _ ->
+                        ( { model | drag = dragModel }
+                        , dragCmd
+                            |> Cmd.map (\msg -> DragMsg msg)
+                        )
 
 
 commitList model =
     case model.drag of
         Drag.Editing i value ->
-            model.list
-                |> set i value
+            if value == "" then
+                model.list |> remove i
+            else
+                model.list |> set i value
 
         _ ->
             model.list
@@ -120,25 +166,26 @@ set i value list =
         ++ (value :: (list |> List.drop (i + 1)))
 
 
-dragUp : Mouse.Event -> Model -> Model
-dragUp event model =
-    let
-        newDrag =
-            Drag.update (Drag.Up event) model.drag
-    in
-        case model.drag of
-            Drag.ActiveDrag { startI, dragI } ->
-                { model
-                    | drag =
-                        Drag.update (Drag.Up event) model.drag
-                    , list =
-                        model.list
-                            |> swap startI dragI
-                            |> Maybe.withDefault model.list
-                }
+dragUp : Mouse.Event -> Model -> Drag.Drag -> Cmd Drag.Msg -> ( Model, Cmd Msg )
+dragUp event model dragModel dragCmd =
+    case model.drag of
+        Drag.ActiveDrag { startI, dragI } ->
+            ( { model
+                | drag = dragModel
+                , list =
+                    model.list
+                        |> swap startI dragI
+                        |> Maybe.withDefault model.list
+              }
+            , dragCmd
+                |> Cmd.map (\msg -> DragMsg msg)
+            )
 
-            _ ->
-                { model | drag = newDrag }
+        _ ->
+            ( { model | drag = dragModel }
+            , dragCmd
+                |> Cmd.map (\msg -> DragMsg msg)
+            )
 
 
 swap : Int -> Int -> List String -> Maybe (List String)
@@ -180,9 +227,14 @@ swap i j list =
                     )
 
 
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Keyboard.presses KeyPress
+remove : Int -> List String -> List String
+remove i list =
+    (list
+        |> List.take i
+    )
+        ++ (list
+                |> List.drop (i + 1)
+           )
 
 
 view : Model -> Html Msg
@@ -218,6 +270,7 @@ appendItemView model =
             [ Input.placeholder "label"
             , Input.value model.input
             , Input.onInput TextInput
+            , Input.attrs [ class textInputClass ]
             ]
         )
         |> InputGroup.predecessors [ InputGroup.span [] [ text "New Item" ] ]
@@ -304,6 +357,9 @@ editingListItemView i item =
         )
         [ Input.text
             [ Input.value item
-            , Input.attrs [ (Drag.Edition) |> onInput ]
+            , Input.attrs
+                [ (Drag.Edition) |> onInput
+                , class Drag.editingInputClass
+                ]
             ]
         ]
