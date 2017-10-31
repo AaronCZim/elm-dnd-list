@@ -4,7 +4,7 @@ import Mouse
 import Keyboard
 import Dom
 import Task
-import SelectClassName
+import SelectDom
 
 
 type Drag
@@ -131,5 +131,5 @@ editingInputClass =
 
 inputSelect i =
     ("." ++ editingInputClass)
-        |> SelectClassName.select
+        |> SelectDom.select
         |> Task.attempt (\_ -> NoOp)

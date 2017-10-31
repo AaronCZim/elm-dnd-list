@@ -17,7 +17,7 @@ import Bootstrap.Button as Button
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
 import DnDList.Drag as Drag
-import SelectClassName
+import SelectDom
 
 
 textInputClass =
@@ -31,7 +31,7 @@ subscriptions model =
 
 inputFocus =
     ("." ++ textInputClass)
-        |> SelectClassName.focus
+        |> SelectDom.focus
         |> Task.attempt (\_ -> NoOp)
 
 
