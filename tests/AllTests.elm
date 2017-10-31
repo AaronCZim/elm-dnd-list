@@ -62,6 +62,11 @@ all =
                 (("zero" :: init3List) |> swap 2 1)
                     |> Expect.equal
                         (Just [ "zero", "two", "one", "three" ])
+        , test """set 0 to zero in init3List""" <|
+            \() ->
+                (init3List |> set 0 "zero")
+                    |> Expect.equal
+                        [ "zero", "two", "three" ]
         ]
 
 

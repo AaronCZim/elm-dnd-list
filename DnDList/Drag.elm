@@ -5,6 +5,8 @@ import Mouse
 
 type Drag
     = NoDrag
+    | DragTracking
+    | Editing Int String
     | Hover Int
     | DragStart Int
     | ActiveDrag { startI : Int, dragI : Int }
@@ -16,7 +18,13 @@ init =
 
 
 type Msg
-    = EnterI Int
+    = StartTracking
+    | StopTracking
+    | Edit Int String
+    | Edition String
+    | Commit
+    | CommitHoveringOn Int
+    | EnterI Int
     | Leave
     | Move Mouse.Event
     | Down Mouse.Event
@@ -26,8 +34,54 @@ type Msg
 update : Msg -> Drag -> Drag
 update msg model =
     case msg of
+        StartTracking ->
+            case model of
+                NoDrag ->
+                    DragTracking
+
+                _ ->
+                    model
+
+        StopTracking ->
+            case model of
+                Editing i val ->
+                    model
+
+                _ ->
+                    NoDrag
+
+        Edit i value ->
+            Editing i value
+
+        Edition value ->
+            case model of
+                Editing i val ->
+                    Editing i value
+
+                _ ->
+                    model
+
+        Commit ->
+            case model of
+                Editing i val ->
+                    DragTracking
+
+                _ ->
+                    model
+
+        CommitHoveringOn i ->
+            case model of
+                Editing j val ->
+                    Hover i
+
+                _ ->
+                    model
+
         EnterI i ->
             case model of
+                Editing i val ->
+                    model
+
                 ActiveDrag { startI, dragI } ->
                     ActiveDrag { startI = startI, dragI = i }
 
@@ -39,11 +93,11 @@ update msg model =
 
         Leave ->
             case model of
-                ActiveDrag { startI, dragI } ->
-                    CancelDrag startI
+                Hover i ->
+                    DragTracking
 
                 _ ->
-                    NoDrag
+                    model
 
         Move event ->
             case model of

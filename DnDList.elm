@@ -69,8 +69,38 @@ update msg model =
                 Drag.Up event ->
                     dragUp event model
 
+                Drag.Commit ->
+                    { model
+                        | drag = Drag.update msg model.drag
+                        , list = commitList model
+                    }
+
+                Drag.CommitHoveringOn i ->
+                    { model
+                        | drag = Drag.update msg model.drag
+                        , list = commitList model
+                    }
+
                 _ ->
                     { model | drag = Drag.update msg model.drag }
+
+
+commitList model =
+    case model.drag of
+        Drag.Editing i value ->
+            model.list
+                |> set i value
+
+        _ ->
+            model.list
+
+
+set : Int -> String -> List String -> List String
+set i value list =
+    (list
+        |> List.take i
+    )
+        ++ (value :: (list |> List.drop (i + 1)))
 
 
 dragUp : Mouse.Event -> Model -> Model
@@ -143,13 +173,18 @@ view model =
         [ CDN.stylesheet
         , Grid.row []
             [ Grid.col [ Col.xs12 ]
-                [ Card.config []
+                [ Card.config
+                    [ Card.attrs
+                        [ DragMsg Drag.StartTracking |> onMouseEnter
+                        , DragMsg Drag.StopTracking |> onMouseLeave
+                        ]
+                    ]
                     |> Card.header []
-                        [ h2 [] [ text "Drag and Drop List" ] ]
+                        [ h2 [] [ text "Drop and Drop List" ] ]
                     |> Card.block []
-                        [ Card.custom <| appendItemView model
-                        , Card.custom <| hr [] []
-                        , listView model
+                        [ Card.custom <| appendItemView model ]
+                    |> Card.block []
+                        [ listView model
                         ]
                     |> Card.view
                 ]
@@ -181,12 +216,18 @@ appendItemView model =
 listView : Model -> Card.BlockItem Msg
 listView model =
     Card.custom <|
-        (Html.map mapDragMsg
+        (Html.map (\msg -> DragMsg msg)
             (div
-                [ Drag.Move |> Mouse.onMove
-                , Drag.Down |> Mouse.onDown
-                , Drag.Up |> Mouse.onUp
-                ]
+                (case model.drag of
+                    Drag.Editing i value ->
+                        []
+
+                    _ ->
+                        [ Drag.Move |> Mouse.onMove
+                        , Drag.Down |> Mouse.onDown
+                        , Drag.Up |> Mouse.onUp
+                        ]
+                )
                 [ ListGroup.ul
                     (model.list
                         |> List.indexedMap (listItemView model)
@@ -196,31 +237,48 @@ listView model =
         )
 
 
-mapDragMsg : Drag.Msg -> Msg
-mapDragMsg msg =
-    DragMsg msg
-
-
 listItemView : Model -> Int -> String -> ListGroup.Item Drag.Msg
 listItemView model i item =
-    let
-        active =
-            case model.drag of
-                Drag.ActiveDrag { startI, dragI } ->
-                    i == startI || i == dragI
+    case model.drag of
+        Drag.Editing j value ->
+            if j == i then
+                editingListItemView model i value
+            else
+                displayListItemView False i item
 
-                _ ->
-                    False
-    in
-        ListGroup.li
-            ([ ListGroup.attrs
-                [ (Drag.EnterI i) |> onMouseEnter
-                , Drag.Leave |> onMouseLeave
-                ]
-             ]
-                ++ if active then
-                    [ ListGroup.active ]
-                   else
-                    []
-            )
-            [ text item ]
+        Drag.ActiveDrag { startI, dragI } ->
+            displayListItemView
+                (i == startI || i == dragI)
+                i
+                item
+
+        _ ->
+            displayListItemView False i item
+
+
+displayListItemView : Bool -> Int -> String -> ListGroup.Item Drag.Msg
+displayListItemView active i item =
+    ListGroup.li
+        ([ ListGroup.attrs
+            [ (Drag.EnterI i) |> onMouseEnter
+            , Drag.Leave |> onMouseLeave
+            , (Drag.Edit i item) |> onDoubleClick
+            , (Drag.CommitHoveringOn i) |> onClick
+            ]
+         ]
+            ++ if active then
+                [ ListGroup.active ]
+               else
+                []
+        )
+        [ text item ]
+
+
+editingListItemView : Model -> Int -> String -> ListGroup.Item Drag.Msg
+editingListItemView active i item =
+    ListGroup.li [ ListGroup.active ]
+        [ Input.text
+            [ Input.value item
+            , Input.attrs [ (Drag.Edition) |> onInput ]
+            ]
+        ]
