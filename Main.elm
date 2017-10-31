@@ -5,8 +5,9 @@ import DnDList exposing (..)
 
 
 main =
-    Html.beginnerProgram
-        { model = init3
+    Html.program
+        { init = ( init3, Cmd.none )
         , update = update
+        , subscriptions = subscriptions
         , view = view
         }

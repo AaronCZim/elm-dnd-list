@@ -1,13 +1,13 @@
 module DnDList.Drag exposing (..)
 
 import Mouse
+import Keyboard
 
 
 type Drag
     = NoDrag
     | DragTracking
     | Editing Int String
-    | Hover Int
     | DragStart Int
     | ActiveDrag { startI : Int, dragI : Int }
     | CancelDrag Int -- drag out of bounds undoes the drag
@@ -23,11 +23,10 @@ type Msg
     | Edit Int String
     | Edition String
     | Commit
-    | CommitHoveringOn Int
     | EnterI Int
     | Leave
     | Move Mouse.Event
-    | Down Mouse.Event
+    | Down Int Mouse.Event
     | Up Mouse.Event
 
 
@@ -69,17 +68,9 @@ update msg model =
                 _ ->
                     model
 
-        CommitHoveringOn i ->
-            case model of
-                Editing j val ->
-                    Hover i
-
-                _ ->
-                    model
-
         EnterI i ->
             case model of
-                Editing i val ->
+                Editing j value ->
                     model
 
                 ActiveDrag { startI, dragI } ->
@@ -89,12 +80,12 @@ update msg model =
                     ActiveDrag { startI = startI, dragI = i }
 
                 _ ->
-                    Hover i
+                    DragTracking
 
         Leave ->
             case model of
-                Hover i ->
-                    DragTracking
+                Editing i value ->
+                    model
 
                 _ ->
                     model
@@ -107,9 +98,9 @@ update msg model =
                 _ ->
                     model
 
-        Down event ->
+        Down i event ->
             case model of
-                Hover i ->
+                DragTracking ->
                     DragStart i
 
                 _ ->
@@ -118,10 +109,10 @@ update msg model =
         Up event ->
             case model of
                 ActiveDrag { startI, dragI } ->
-                    Hover dragI
+                    DragTracking
 
                 DragStart i ->
-                    Hover i
+                    DragTracking
 
                 _ ->
                     model

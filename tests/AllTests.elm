@@ -9,22 +9,22 @@ all =
     describe "All DnDList Tests"
         [ test """Append "hello" to empty""" <|
             \() ->
-                (init |> update (Append "hello"))
+                (init |> updateModel (Append "hello"))
                     |> Expect.equal (fromList [ "hello" ])
         , test """Append "hi" to ["hello"]""" <|
             \() ->
-                (fromList [ "hello" ] |> update (Append "hi"))
+                (fromList [ "hello" ] |> updateModel (Append "hi"))
                     |> Expect.equal (fromList [ "hello", "hi" ])
         , test """Remove 0 from ["hello", "hi"]""" <|
             \() ->
                 (fromList [ "hello", "hi" ]
-                    |> update (Remove 0)
+                    |> updateModel (Remove 0)
                 )
                     |> Expect.equal (fromList [ "hi" ])
         , test """Remove 1 from ["hello", "hi"]""" <|
             \() ->
                 (fromList [ "hello", "hi" ]
-                    |> update (Remove 1)
+                    |> updateModel (Remove 1)
                 )
                     |> Expect.equal (fromList [ "hello" ])
         , test """swap 0 -1 ["one", "two", "three"]""" <|

@@ -4,6 +4,8 @@ import Html exposing (..)
 import Html.Events exposing (..)
 import Html.Attributes exposing (..)
 import Mouse
+import Keyboard
+import Char
 import Bootstrap.CDN as CDN
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
@@ -38,11 +40,17 @@ type Msg
     = Append String
     | Remove Int
     | TextInput String
+    | KeyPress Keyboard.KeyCode
     | DragMsg Drag.Msg
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    ( updateModel msg model, Cmd.none )
+
+
+updateModel : Msg -> Model -> Model
+updateModel msg model =
     case msg of
         Append value ->
             { model
@@ -64,18 +72,27 @@ update msg model =
         TextInput str ->
             { model | input = str }
 
+        KeyPress keyCode ->
+            -- KeyCode 13 is the return key
+            if keyCode == 13 then
+                case model.drag of
+                    Drag.Editing i value ->
+                        { model
+                            | drag = Drag.update Drag.Commit model.drag
+                            , list = commitList model
+                        }
+
+                    _ ->
+                        model
+            else
+                model
+
         DragMsg msg ->
             case msg of
                 Drag.Up event ->
                     dragUp event model
 
                 Drag.Commit ->
-                    { model
-                        | drag = Drag.update msg model.drag
-                        , list = commitList model
-                    }
-
-                Drag.CommitHoveringOn i ->
                     { model
                         | drag = Drag.update msg model.drag
                         , list = commitList model
@@ -111,18 +128,14 @@ dragUp event model =
     in
         case model.drag of
             Drag.ActiveDrag { startI, dragI } ->
-                case newDrag of
-                    Drag.Hover i ->
-                        { model
-                            | drag = newDrag
-                            , list =
-                                model.list
-                                    |> swap startI dragI
-                                    |> Maybe.withDefault model.list
-                        }
-
-                    _ ->
-                        { model | drag = newDrag }
+                { model
+                    | drag =
+                        Drag.update (Drag.Up event) model.drag
+                    , list =
+                        model.list
+                            |> swap startI dragI
+                            |> Maybe.withDefault model.list
+                }
 
             _ ->
                 { model | drag = newDrag }
@@ -165,6 +178,11 @@ swap i j list =
                         ++ [ av ]
                         ++ (list |> List.drop (b + 1))
                     )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Keyboard.presses KeyPress
 
 
 view : Model -> Html Msg
@@ -224,7 +242,6 @@ listView model =
 
                     _ ->
                         [ Drag.Move |> Mouse.onMove
-                        , Drag.Down |> Mouse.onDown
                         , Drag.Up |> Mouse.onUp
                         ]
                 )
@@ -242,7 +259,7 @@ listItemView model i item =
     case model.drag of
         Drag.Editing j value ->
             if j == i then
-                editingListItemView model i value
+                editingListItemView i value
             else
                 displayListItemView False i item
 
@@ -262,8 +279,9 @@ displayListItemView active i item =
         ([ ListGroup.attrs
             [ (Drag.EnterI i) |> onMouseEnter
             , Drag.Leave |> onMouseLeave
+            , (Drag.Down i) |> Mouse.onDown
+            , Drag.Commit |> onClick
             , (Drag.Edit i item) |> onDoubleClick
-            , (Drag.CommitHoveringOn i) |> onClick
             ]
          ]
             ++ if active then
@@ -274,9 +292,16 @@ displayListItemView active i item =
         [ text item ]
 
 
-editingListItemView : Model -> Int -> String -> ListGroup.Item Drag.Msg
-editingListItemView active i item =
-    ListGroup.li [ ListGroup.active ]
+editingListItemView : Int -> String -> ListGroup.Item Drag.Msg
+editingListItemView i item =
+    ListGroup.li
+        ([ ListGroup.attrs
+            [ (Drag.EnterI i) |> onMouseEnter
+            , Drag.Leave |> onMouseLeave
+            ]
+         , ListGroup.active
+         ]
+        )
         [ Input.text
             [ Input.value item
             , Input.attrs [ (Drag.Edition) |> onInput ]
